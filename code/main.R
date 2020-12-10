@@ -1,13 +1,3 @@
-# Load libraries
-library(tidyverse)
-library(eurostat)
-library(stringr)
-library(sf)
-library(raster)
-library(rgdal)
-library(ncdf4) # we need this package but i think we need to ask someone to install the package on the server
-
-
 # Download data ----------------------------------------------------------------
 # we will use NUTS3, we add the shapefile directly for all non-EUROSTAT stuff
 # after downloading, the data will be pre-processed to have a common standard
@@ -15,7 +5,7 @@ library(ncdf4) # we need this package but i think we need to ask someone to inst
 # variable names are lower case letters, the actual value is saved in $value
 
 # shape_nuts3 is our base-shapefile
-source("code/00_download_shapefile.R")
+source("code/00_libraries_functions.R")
 
 source("code/01_download_EDGAR.R") # output: data_edgar
 # output: data_eurostat
