@@ -1,9 +1,6 @@
 ## This file is used to download all desired data from eurostat-----------------
 
-# load packages
-library(eurostat)
-library(tidyverse)
-
+# source("code/00_libraries_functions.R")
 
 # Download Data followin Videras:-----------------------------------------------
 
@@ -126,11 +123,13 @@ roadload <- get_eurostat("road_go_na_rl3g") %>%
 roadunload <- get_eurostat("road_go_na_ru3g") %>% 
   filter(nchar(geo) == 5 & nst07 =="TOTAL") 
 
-roadtotal <- roadload %>% left_join(roadunload, by = "geo") %>% 
+roadtotal <- roadload %>% 
+  left_join(roadunload, by = c("geo", "time", "unit")) %>% 
   mutate(values = values.x + values.y) %>% 
-  select(unit.x, geo, time.x, values)
-roadtotal$time.x <- format(as.Date(roadtotal$time.x, format="%Y/%m/%d"),"%Y")
-roadtotal$unit.x <- "roadtotal"
+  dplyr::select(unit, geo, time, values)
+
+roadtotal$time <- format(as.Date(roadtotal$time, format="%Y/%m/%d"),"%Y")
+roadtotal$unit <- "roadtotal"
 colnames(roadtotal) <- c("unit", "geo", "time","values")
   
 
