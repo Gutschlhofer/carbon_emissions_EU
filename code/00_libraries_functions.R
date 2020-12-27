@@ -49,11 +49,7 @@ getShapefile <- function(replace = FALSE){
     shape_nuts3 <- shape_nuts3 %>% 
       dplyr::filter(!nuts3_id %in% overseas)
     
-    plot(sf::st_geometry(shape_nuts3))
-
-    unlink("./input/shapefile/nuts3.shp")
-    sf::st_write(shape_nuts3, "./input/shapefile/nuts3.shp")
-    
+    # plot(sf::st_geometry(shape_nuts3))
     
     # re-project into an azimuthal projection (keeping area constant, hence using true area representation)
     shape_equalarea <- st_transform(shape_nuts3, "epsg:3035")
@@ -84,6 +80,9 @@ getShapefile <- function(replace = FALSE){
     # shape_nuts3 <- st_read("./input/shapefile", "NUTS_RG_01M_2021_4326_LEVL_3")
     # file.remove("input/shapefile/NUTS_2021_01M.zip")
   
+    unlink("./input/shapefile/nuts3.shp")
+    sf::st_write(shape_nuts3, "./input/shapefile/nuts3.shp")
+    
     return(shape_nuts3)
   }
 }
