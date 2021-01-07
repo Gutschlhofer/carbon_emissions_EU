@@ -1,21 +1,6 @@
 # load data
 data <- readRDS("input/data.rds")
 
-# temp fix
-data <- data %>% 
-  dplyr::mutate(gwa_share_BE = `gwa_share_B-E`,
-                gwa_share_GI = `gwa_share_G-I`) %>% 
-  dplyr::select(-`gwa_share_B-E`, -`gwa_share_G-I`)
-
-data <- data %>% 
-  dplyr::mutate(
-    # gdppc_2 = gdppc^2,
-    density = pop/area,
-    heating_or_cooling = HDD + CDD,
-    CDD_fix = CDD+1, # move our scale by 1 to be able to log it
-    cdd_log = ifelse(CDD == 0, 0, log(CDD))
-  )
-
 # data <- data %>% 
 #   dplyr::filter(!cntr_code %in% c("UK", "NO",
 #                                   "AL", "CH", 
@@ -27,9 +12,29 @@ data <- data %>%
 
 # I=PAT
 model_base <- log(edgar) ~ log(pop) + log(density) + log(gdppc) + 
-  I(log(gdppc)^2) + log(gwa_share_BE) + log(gwa_share_GI) +
+  I(log(gdppc)^2) + log(gwa_share_BE) + # log(gwa_share_GI) +
   # log(heating_or_cooling) +
   # log(HDD) + cdd_log +
-  log(HDD) + log(CDD_fix)
+  log(hdd) + log(cdd_fix)
 ols_base <- lm(model_base, data)
 summary(ols_base)
+
+model_cntr <- log(edgar) ~ log(pop) + log(density) + log(gdppc) + 
+  I(log(gdppc)^2) + log(gwa_share_BE) + # log(gwa_share_GI) +
+  # log(heating_or_cooling) +
+  # log(HDD) + cdd_log +
+  log(hdd) + log(cdd_fix) + cntr_code
+ols_cntr <- lm(model_cntr, data)
+summary(ols_cntr)
+
+data_coords <- st_coordinates(st_centroid(data$geometry))
+
+# bw neighbours
+lw <- knearneigh(data_coords, k=100) %>% 
+  knn2nb() %>% 
+  nb2listw()
+moran.test(data$edgar, lw)
+
+moran.test(ols_base$residuals, lw)
+moran.test(ols_cntr$residuals, lw)
+
