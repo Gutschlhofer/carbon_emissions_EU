@@ -130,6 +130,14 @@ run_gwr(method = "bisq", adapt = 0.203187) # result of bisq AIC
 run_gwr(method = "bisq", adapt = .1, file_name_add = "_lessneighbours")
 run_gwr(method = "bisq", adapt = .3, file_name_add = "_moreneighbours")
 
+gwr <- readRDS("input/gwr.rds")
+gwr_lessnb <- readRDS("input/gwr_lessneighbours.rds")
+gwr_morenb <- readRDS("input/gwr_moreneighbours.rds")
+
+data_coef <- readRDS("input/data_coef.rds")
+# data_coef <- readRDS("input/data_coef_lessneighbours.rds")
+# data_coef <- readRDS("input/data_coef_moreneighbours.rds")
+
 # 4. Visualise -----------------------------------------------------------------
 
 theme_set(theme_minimal())
