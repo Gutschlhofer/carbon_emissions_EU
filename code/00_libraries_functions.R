@@ -1,23 +1,28 @@
 # Load libraries
-library(tidyverse)
-library(eurostat)
-library(stringr)
-library(sf)
-library(raster)
-library(rgdal)
-library(ncdf4)
-library(foreach)
-library(doMC)
-library(ggplot2)
-library(scales)
-library(viridis)
-library(spdep)
-library(cartography)
-library(summarytools)
-library(stargazer)
-library(ggpattern)
-library(spgwr)
+# install.packages("pacman")
+library(pacman)
 
+p_load(tidyverse)
+p_load(eurostat)
+p_load(stringr)
+p_load(sf)
+p_load(raster)
+p_load(rgdal)
+p_load(ncdf4)
+p_load(foreach)
+p_load(doMC)
+p_load(ggplot2)
+p_load(scales)
+p_load(viridis)
+p_load(spdep)
+p_load(cartography)
+p_load(summarytools)
+p_load(stargazer)
+p_load(ggpattern)
+p_load(spgwr)
+p_load(nngeo)
+p_load(gridExtra)
+# add new packages with p_load(packagename)
 
 ## eurostat NUTS 3 shapefile----------------------------------------------------
 
@@ -105,6 +110,8 @@ names(shape_nuts1) <- tolower(names(shape_nuts1))
 shape_nuts1_agg <- shape_nuts1 %>% 
   filter(!nuts_id %in% c("FRY", "PT2", "PT3", "ES7") & (cntr_code != "TR" & cntr_code != "IS" & cntr_code != "CY") ) %>% 
   count(cntr_code)
+
+shape_nuts1_agg <- st_remove_holes(shape_nuts1_agg)
 
 # getShapefile(replace = TRUE)
 
