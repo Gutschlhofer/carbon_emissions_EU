@@ -3,7 +3,7 @@
 
 if(! file.exists("./input/data_edgar.rds")) {
   
-  source("./code/00_libraries_functions.R")
+  # source("./code/00_libraries_functions.R")
   
   dir.create("input/edgar")
   

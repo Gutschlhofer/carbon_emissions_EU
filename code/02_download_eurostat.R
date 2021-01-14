@@ -2,7 +2,7 @@
 
 if(! file.exists("./input/data_eurostat.rds")) {
   
-  source("./code/00_libraries_functions.R")
+  # source("./code/00_libraries_functions.R")
   
   # Download Data following Videras:--------------------------------------------
   
@@ -180,5 +180,4 @@ if(! file.exists("./input/data_eurostat.rds")) {
   saveRDS(fineurostat, "./input/data_eurostat.rds")
   
 }
-
 
