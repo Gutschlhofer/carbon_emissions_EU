@@ -1,6 +1,3 @@
-# Libraries
-library(spgwr)
-
 # # alternative
 # library(GWmodel)
 # bw.ggwr
@@ -8,10 +5,12 @@ library(spgwr)
 # gwr.basic
 # gwr.robust
 
-source("code/00_libraries_functions.R")
-source("code/06_model_OLS.R")
+# source("code/00_libraries_functions.R")
+# source("code/06_model_OLS.R")
 
 # 1. Prepare data for GWR ------------------------------------------------------
+
+# data <- data_fix_outlier
 
 # data_coords <- st_coordinates(st_point_on_surface(data$geometry))
 data_coords <- st_coordinates(st_centroid(data$geometry))
@@ -48,28 +47,27 @@ run_gwr <- function(method = c("bisq","gauss","tricube"),
                           ,method = "aic"),
                  adapt)
     # 0.203187
+    # 0.23975778 for data_fix_outlier
     
-    gwr <- gwr(model_base, data = spdf, # data = data, coords = data_coords, 
+    gwr <- gwr(model_base, data = spdf,
                adapt = bw, gweight = gwr.bisquare,
                longlat = TRUE, se.fit = TRUE, hatmatrix = TRUE)
     
   } else if(bw_fct == "gauss"){
-    # TODO adjust to function
-    bw <- gwr.sel(model_base, data = spdf,# coords = data_coords, 
+    bw <- gwr.sel(model_base, data = spdf,
                   gweight = gwr.Gauss, longlat = TRUE, verbose = FALSE,
-                  method = "aic")
+                  adapt = TRUE, method = "aic")
     
-    gwr <- gwr(model_base, data = spdf, # data = data, coords = data_coords, 
-               bandwidth = bw, gweight = gwr.Gauss,
+    gwr <- gwr(model_base, data = spdf,
+               adapt = bw, gweight = gwr.Gauss,
                longlat = TRUE, se.fit = TRUE, hatmatrix = TRUE)
   } else {
-    # TODO adjust to function
-    bw <- gwr.sel(model_base, data = spdf,# coords = data_coords, 
-                  gweight = gwr.tricube, longlat = TRUE, verbose = FALSE)#,
-    #method = "aic") # AIC does not work for tricube
+    bw <- gwr.sel(model_base, data = spdf, 
+                  gweight = gwr.tricube, longlat = TRUE, verbose = FALSE,
+                  adapt = TRUE, method = "aic")
     
-    gwr <- gwr(model_base, data = spdf, # data = data, coords = data_coords, 
-               bandwidth = bw, gweight = gwr.tricube,
+    gwr <- gwr(model_base, data = spdf,
+               adapt = bw, gweight = gwr.tricube,
                longlat = TRUE, se.fit = TRUE, hatmatrix = TRUE)
   }
   
@@ -117,15 +115,185 @@ run_gwr <- function(method = c("bisq","gauss","tricube"),
   
   data_coef <- cbind(data,st_drop_geometry(coef),gwr_output[,all_of(c(p_vec, sig_vec))])
   
+  # save the files
   file_name_gwr <- paste0("input/gwr",file_name_add, ".rds")
   file_name <- paste0("input/data_coef",file_name_add, ".rds")
-  
   saveRDS(gwr, file_name_gwr)
   saveRDS(data_coef, file_name)
-  # data_coef <- readRDS(file_name)
+  
+  # 4. Visualise -----------------------------------------------------------------
+  
+  plot_path <- "output/plots/"
+  plot_template <- paste0("gwr_%s",file_name_add,".png")
+  
+  theme_set(theme_minimal())
+  
+  # log.gdppc.
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.gdppc.), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc"))
+  
+  
+  # I.log.gdppc..2.
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = I.log.gdppc..2.), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc2"))
+  
+  
+  # log.density.
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.density.), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_Density"))
+  
+  
+  # gwa_share_BE
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = gwa_share_BE), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"))
+  
+  
+  # log.hdd.
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.hdd.), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_HDD"))
+  
+  
+  # log.cdd_fix.
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.cdd_fix.), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_CDD_fix"))
+  
+  boxplot(data_coef$localR2)
+  
+  
+  # localR2
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = localR2), color = "white", size=0.01) + 
+    scale_fill_viridis_c(option = "magma", direction = -1, labels = scales::percent_format(accuracy = 1)) +  
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "local_R2"))
+  
+  
+  
+  # significance plots -----------------------------------------------------------
+    plot_template <- paste0("gwr_%s",file_name_add,"_signif.png")
+  
+    # log.pop._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.pop._p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_Pop"))
+  
+  
+  # log.density._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.density._p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_Density"))
+  
+  
+  # log.gdppc._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.gdppc._p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc"))
+  
+  
+  # I.log.gdppc..2._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = I.log.gdppc..2._p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc2"))
+  
+  
+  # log.gwa_share_BE._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = gwa_share_BE_p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"))
+  
+  
+  # log.hdd._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.hdd._p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_HDD"))
+  
+  
+  # log.cdd_fix._p_sig
+  ggplot(data = data_coef) +
+    geom_sf(data = shape_nuts1_agg, fill="white") +
+    geom_sf(aes(fill = log.cdd_fix._p_sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = rev(magma(4)[2:4])) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  ggsave(path = plot_path, filename = sprintf(plot_template, "log_CDD_fix"))
+  
+  
+  # 5. Tests ---------------------------------------------------------------------
+  
+  # bw neighbours
+  lw <- knearneigh(data_coords, k=round(bw)) %>% 
+    knn2nb() %>% 
+    nb2listw()
+  gwr.morantest(gwr, lw = lw)
+  # 100 neighbours
+  lw <- knearneigh(data_coords, k=100) %>% 
+    knn2nb() %>% 
+    nb2listw()
+  gwr.morantest(gwr, lw = lw)
+  # 20 neighbours
+  lw <- knearneigh(data_coords, k=20) %>% 
+    knn2nb() %>% 
+    nb2listw()
+  gwr.morantest(gwr, lw = lw)
 }
 
-# run_gwr(method = "bisq")
+run_gwr(method = "bisq", file_name_add = "_fixoutlier")
 run_gwr(method = "bisq", adapt = 0.203187) # result of bisq AIC
 run_gwr(method = "bisq", adapt = .1, file_name_add = "_lessneighbours")
 run_gwr(method = "bisq", adapt = .3, file_name_add = "_moreneighbours")
@@ -138,151 +306,9 @@ data_coef <- readRDS("input/data_coef.rds")
 # data_coef <- readRDS("input/data_coef_lessneighbours.rds")
 # data_coef <- readRDS("input/data_coef_moreneighbours.rds")
 
-# 4. Visualise -----------------------------------------------------------------
-
-theme_set(theme_minimal())
-
-# log.gdppc.
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.gdppc.), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# I.log.gdppc..2.
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = I.log.gdppc..2.), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.density.
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.density.), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# gwa_share_BE
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = gwa_share_BE), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.hdd.
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.hdd.), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.cdd_fix.
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.cdd_fix.), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-
-boxplot(data_coef$localR2)
-
-# localR2
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = localR2), color = "white", size=0.01) + 
-  scale_fill_viridis_c(option = "magma", direction = -1, labels = scales::percent_format(accuracy = 1)) +  
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-
-
-# significance plots -----------------------------------------------------------
-# log.pop._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.pop._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.density._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.density._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.gdppc._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.gdppc._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# I.log.gdppc..2._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = I.log.gdppc..2._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.gwa_share_BE._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.gwa_share_BE._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.hdd._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.hdd._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# log.cdd_fix._p_sig
-ggplot(data = data_coef) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
-  geom_sf(aes(fill = log.cdd_fix._p_sig), color = "white", size=0.01) + 
-  scale_fill_manual(values = rev(magma(4)[2:4])) +
-  theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-
-
-# 5. Tests ---------------------------------------------------------------------
-
-# bw neighbours
-lw <- knearneigh(data_coords, k=round(bw)) %>% 
-  knn2nb() %>% 
-  nb2listw()
-gwr.morantest(gwr, lw = lw)
-# 100 neighbours
-lw <- knearneigh(data_coords, k=100) %>% 
-  knn2nb() %>% 
-  nb2listw()
-gwr.morantest(gwr, lw = lw)
-# 20 neighbours
-lw <- knearneigh(data_coords, k=20) %>% 
-  knn2nb() %>% 
-  nb2listw()
-gwr.morantest(gwr, lw = lw)
 
 # library(GWmodel)
 # 
 # bw <- GWmodel::bw.gwr(formula = model_base, data = spdf,
 #                       approach = "AIC", longlat=T)
-
 

@@ -16,7 +16,7 @@ library(cartography)
 library(summarytools)
 library(stargazer)
 library(ggpattern)
-
+library(spgwr)
 
 
 ## eurostat NUTS 3 shapefile----------------------------------------------------
@@ -107,3 +107,4 @@ shape_nuts1_agg <- shape_nuts1 %>%
   count(cntr_code)
 
 # getShapefile(replace = TRUE)
+
