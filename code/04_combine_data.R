@@ -55,13 +55,16 @@ data_fix_outlier <- data %>%
                 density = ifelse(density > quantile(density,0.99), quantile(density,0.99), density),
                 gdppc = ifelse(gdppc > quantile(gdppc,0.99), quantile(gdppc,0.99), gdppc))
 
+summary(data)
+saveRDS(data, "input/data.rds")
+saveRDS(data_fix_outlier, "input/data_fix_outlier.rds")
+
+# Create cor tables ------------------------------------------------------------
 temp <- st_drop_geometry(data_fix_outlier)
 temp$gdppc2 <- data$gdppc^2
-
 # correlation of actual values
 cor(temp %>% dplyr::select(edgar, pop, gdppc, gdppc2, density, gwa_share_BE, hdd, cdd_fix)) %>% 
-  stargazer() %>% 
-  cat(.,file="output/tables/cor.tex",sep="\n")
+  stargazer(out = "output/tables/cor.tex")
 # correlation of log values (care: different gdppc2 specification)
 temp_log <- temp %>% mutate(
   edgar = log(edgar),
@@ -73,12 +76,7 @@ temp_log <- temp %>% mutate(
   hdd = log(hdd),
   cdd_fix = log(cdd_fix))
 cor(temp_log %>% dplyr::select(edgar, pop, gdppc, gdppc2, density, gwa_share_BE, hdd, cdd_fix)) %>% 
-  stargazer() %>% 
-  cat(.,file="output/tables/cor_log.tex",sep="\n")
-
-summary(data)
-saveRDS(data, "input/data.rds")
-saveRDS(data_fix_outlier, "input/data_fix_outlier.rds")
+  stargazer(out = "output/tables/cor_log.tex")
 
 # # maybe needed for time dimension
 # 
