@@ -1,10 +1,13 @@
-source("code/00_libraries_functions.R")
-
 # load data
 
-data <- readRDS("input/data.rds")
+# data <- readRDS("input/data.rds")
 
 theme_set(theme_minimal())
+
+# save plots under
+plot_path <- "output/plots/"
+plot_template <- paste0("raw_%s",".png")
+# plot_template <- paste0("raw_%s",".rds")
 
 
 ## EDGAR data ------------------------------------------------------------------
@@ -13,9 +16,9 @@ theme_set(theme_minimal())
 # it all looks the same because we basically just have one outlier in germany that skews the data
 
 # ggplot(data = data) +
-#   geom_sf(aes(fill = edgar), color = "black") +
-#   ggtitle ("Emission levels across Europe")  +
-#   scale_fill_viridis_c(option = "magma", direction = -1)
+#  geom_sf(aes(fill = edgar), color = "black") +
+#  ggtitle ("Emission levels across Europe")  +
+#  scale_fill_viridis_c(option = "magma", direction = -1)
 
 # so let's rewrite this into quantiles:
 no_classes <- 5
@@ -39,14 +42,14 @@ data$edgar_quantiles <- cut(data$edgar,
 
 
 ggplot(data = data) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
+  geom_sf_pattern(data = shape_nuts1_agg, colour = 'black', fill = 'white') +
   geom_sf(aes(fill = edgar_quantiles), color = "white", size=0.01) +
-# ggtitle ("CO2 emission levels across Europe", subtitle = "expressed in kton substance/year") +
   scale_fill_viridis(direction = -1, discrete = TRUE) + 
-# scale_fill_manual(values = rev(viridis(7)[2:7])) + 
   guides(fill = guide_legend(reverse = TRUE)) +
   theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='black', fill=NA, size=0.1) 
+  geom_sf(data=shape_nuts1_agg, color='black', fill=NA, size=0.1) + 
+  theme(plot.margin=grid::unit(c(0,0,0,0), "cm")) 
+ggsave(path = plot_path, filename = sprintf(plot_template, "Edgar_quantiles"), scale=1)
 
 
 ## GDP p.c. --------------------------------------------------------------------
@@ -76,46 +79,58 @@ data$gdppc_quantiles <- cut(data$gdppc,
                             include.lowest = T)
 
 ggplot(data = data) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
+  geom_sf_pattern(data = shape_nuts1_agg, colour = 'black', fill = 'white') +
   geom_sf(aes(fill = gdppc_quantiles), color = "white", size=0.01) +
- # ggtitle ("GDP per capita", subtitle = "in euros")  +
   scale_fill_viridis(direction = -1, discrete = TRUE) + 
   guides(fill = guide_legend(reverse = TRUE)) +
   theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
+  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1) + 
+  theme(plot.margin=grid::unit(c(0,0,0,0), "cm")) 
+ggsave(path = plot_path, filename = sprintf(plot_template, "GDPpc_quantiles"))
 
 
 ## employment shares -----------------------------------------------------------
 ggplot(data = data) + 
-  geom_sf(data = shape_nuts1_agg, fill="white") +
+  geom_sf_pattern(data = shape_nuts1_agg, colour = 'black', fill = 'white') +
   geom_sf(aes(fill = gwa_share_BE), color = "white", size=0.01) +
-  #ggtitle ("Employment shares in manufacturing", subtitle = "NACE classes B-E") +
   scale_fill_viridis_c(option = "magma", direction = -1, labels = percent) +  
   theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
+  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1) + 
+  theme(plot.margin=grid::unit(c(0,0,0,0), "cm")) 
+ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"))
 
 
 ## CDD -------------------------------------------------------------------------
-ggplot(data = data) + 
-  geom_sf(data = shape_nuts1_agg, fill="white") +
+cdd <- ggplot(data = data) + 
+  geom_sf_pattern(data = shape_nuts1_agg, colour = 'black', fill = 'white') +
+  #geom_sf(data = shape_nuts1_agg, fill="white") +
   geom_sf(aes(fill = cdd), color = "white", size=0.01) +
-  ggtitle ("Cooling Days Index")  +
   scale_fill_viridis_c(option = "magma", direction = -1) +
   theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
+  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1) + 
+  theme(plot.margin=grid::unit(c(0,0,0,0), "cm")) 
+cdd
+ggsave(path = plot_path, filename = sprintf(plot_template, "CDD")) 
 
 
 ## HDD -------------------------------------------------------------------------
-ggplot(data = data) + 
-  geom_sf(data = shape_nuts1_agg, fill="white") +
+hdd <- ggplot(data = data) + 
+  geom_sf_pattern(data = shape_nuts1_agg, colour = 'black', fill = 'white') + 
   geom_sf(aes(fill = hdd), color = "white", size=0.01) +
-  ggtitle ("Heating Days Index")  +
   scale_fill_viridis_c(direction = -1) +
   theme(legend.title = element_blank()) + 
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
+  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1) + 
+  theme(plot.margin=grid::unit(c(0,0,0,0), "cm")) 
+  #theme(plot.background = element_rect(fill = NA))
+hdd
+ggsave(path = plot_path, filename = sprintf(plot_template, "HDD")) 
+
+library(gridExtra)
+grid.arrange(cdd, hdd, ncol=2)
+ggsave(path = plot_path, filename = sprintf(plot_template, "CDD_HDD")) 
+
+# library(gridExtra)
+# grid.arrange(cdd, hdd)
 
 
 ## density ---------------------------------------------------------------------
@@ -151,18 +166,16 @@ data$density_quantiles <- cut(data$density,
                             include.lowest = T)
 
 ggplot(data = data) +
-  geom_sf(data = shape_nuts1_agg, fill="white") +
+  geom_sf_pattern(data = shape_nuts1_agg, colour = 'black', fill = 'white') + 
   geom_sf(aes(fill = density_quantiles), color = "white", size=0.01) +
-  #ggtitle ("Population density", subtitle = "People per km²")  +
-  #scale_fill_viridis(option = "magma", direction = -1, discrete = TRUE) +
   scale_fill_manual(values = rev(magma(8)[3:8])) +
   guides(fill = guide_legend(reverse = TRUE)) +
   theme(legend.title = element_blank()) +
-  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1)
-
-# strichliert/schraffiert für CH, NO, UK, etc ? 
-# , base_size = 4 ? 
-
+  geom_sf(data=shape_nuts1_agg, color='#000000', fill=NA, size=0.1) + 
+  # theme(plot.margin=grid::unit(c(0,0,0,0), "cm")) +
+  # theme(plot.background = element_rect(fill = NA) )
+theme(plot.margin = unit(c(1,1,1,1), "cm"))
+ggsave(path = plot_path, filename = sprintf(plot_template, "Density_quantiles"))
 
 
 
@@ -198,49 +211,21 @@ colnames(summary2) <- c("Mean (orig. values)", "Std.Dev (orig. values)", "Mean (
 summary2 <- round(summary2, 2)
 summary2
 
-library(car)
-scatterplot(edgar ~ gdppc, data = data)
-
-plot(log(data$gdppc), log(data$edgar))
-# abline(lm(log(edgar) ~ log(gdppc) + I(log(gdppc)^2), data = data), col = "blue")
-lines(lowess(log(data$gdppc), log(data$edgar)), col = "blue")
-
-lines(fitted(lm(log(edgar) ~ log(gdppc) + I(log(gdppc)^2), data = data)))
-
-
-
-ggplot(data, aes(x= log(gdppc) , y=  log(edgar) )) + 
-  geom_point() +
-  geom_smooth()
-
-
-
-
-
-
-#### ggpattern?
-# should be easily added
-ggplot(shape_nuts1_agg) + 
-  geom_sf_pattern(data=shape_nuts1_agg, color='black', fill='red', size=0.1)
-
-# example code from ggpattern:
-#   
-# nc <- sf::st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
-# nc <- nc %>% filter(between(CNTY_ID, 1820, 1830))
+# library(car)
+# scatterplot(edgar ~ gdppc, data = data)
+# 
+# plot(log(data$gdppc), log(data$edgar))
+# # abline(lm(log(edgar) ~ log(gdppc) + I(log(gdppc)^2), data = data), col = "blue")
+# lines(lowess(log(data$gdppc), log(data$edgar)), col = "blue")
+# 
+# lines(fitted(lm(log(edgar) ~ log(gdppc) + I(log(gdppc)^2), data = data)))
 # 
 # 
-# p <- ggplot(nc) +
-#   geom_sf_pattern(
-#     aes(
-#       pattern = NAME,
-#       fill    = NAME
-#     ),
-#     pattern_aspect_ratio = 2.8
-#   ) +
-#   theme_bw(15) +
-#   theme(legend.key.size = unit(1.5, 'cm')) +
-#   labs(title = "ggpattern::geom_sf()")
 # 
-# p
-# 
-# https://coolbutuseless.github.io/package/ggpattern/articles/geom-gallery-geometry.html
+# ggplot(data, aes(x= log(gdppc) , y=  log(edgar) )) + 
+#   geom_point() +
+#   geom_smooth()
+
+
+
+
