@@ -8,6 +8,16 @@ library(rgdal)
 library(ncdf4)
 library(foreach)
 library(doMC)
+library(ggplot2)
+library(scales)
+library(viridis)
+library(spdep)
+library(cartography)
+library(summarytools)
+library(stargazer)
+library(ggpattern)
+
+
 
 ## eurostat NUTS 3 shapefile----------------------------------------------------
 
@@ -86,5 +96,14 @@ getShapefile <- function(replace = FALSE){
     return(shape_nuts3)
   }
 }
+
+
+shape_nuts1 <- eurostat::get_eurostat_geospatial(output_class="sf", resolution="1", nuts_level=1, year=2016) 
+names(shape_nuts1) <- tolower(names(shape_nuts1))
+
+
+shape_nuts1_agg <- shape_nuts1 %>% 
+  filter(!nuts_id %in% c("FRY", "PT2", "PT3", "ES7") & (cntr_code != "TR" & cntr_code != "IS" & cntr_code != "CY") ) %>% 
+  count(cntr_code)
 
 # getShapefile(replace = TRUE)
