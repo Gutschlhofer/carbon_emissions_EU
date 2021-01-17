@@ -14,21 +14,38 @@ model_cntr <- log(edgar) ~ log(pop) + log(density) + log(gdppc) +
 ols_cntr <- lm(model_cntr, data)
 summary(ols_cntr)
 
-# TODO: remove country dummies (cntr_), use nice var names, ...
-# using "text" right now for readability of stargazer output 
-stargazer::stargazer(ols_base, ols_cntr, digits=2, type = "text", 
-          single.row = TRUE, no.space = TRUE, 
-          column.sep.width = "3pt", font.size = "small",
-          out = "output/tables/OLS.tex") #%>% # flip = TRUE ?
+output <- stargazer::stargazer(ols_base, ols_cntr, digits=2, # type = "text", 
+                               single.row = TRUE, no.space = TRUE,
+                               covariate.labels = c("Population", "Density", "Income", "Income, Squared",
+                                                  "Gross Value Added in Industry", "Heating Days", "Cooling Days"),
+                               column.sep.width = "3pt", font.size = "tiny",
+                               title = "OLS Regression Results",
+                               out = "output/tables/OLS.tex") # flip = TRUE ?
+
+# filter out all entries containing country dummies
+output <- output[!grepl("cntr",output)]
+constant_line_nr <- grep("Constant",output)
+dummy_line <- "  Country Dummies & no & yes \\\\" # 4 backslashes makes 2
+
+# put output together
+output <- c(output[1:constant_line_nr],
+            dummy_line,
+            output[(constant_line_nr+1):length(output)])
+
+# save output
+cat(output, file = "./output/tables/OLS_dummyshort.tex", sep = "\n")
 
 # Moran I test -----------------------------------------------------------------
+
+# save plots under
+plot_path <- "output/plots/"
 
 ## 1. Create proper W matrix
 
 data_coords <- st_coordinates(st_centroid(data$geometry))
 
 ### knn
-k <- round(0.203187 * nrow(data))
+k <- round(0.203187 * nrow(data)) # use amount of neighbours determined by gwr_sel
 lw_knn <- knearneigh(data_coords, k=k) %>% 
   knn2nb()
 
@@ -66,6 +83,8 @@ moran.test(ols_cntr$residuals, lw_inversedist_all)
 
 ## 3. Local Moran's I Test
 
+plot_template <- paste0("localmoran_sig_%s",".png")
+
 plot_localmoran_sig <- function(test_input, data, lw, subtitle){
   localI <- data.frame(localmoran(test_input, lw))
   data_I <- cbind(data, localI)
@@ -90,11 +109,17 @@ plot_localmoran_sig <- function(test_input, data, lw, subtitle){
 
   ggplot(data = data_I) +
     geom_sf(aes(group = sig, fill = sig), color = "black") +
-    ggtitle ("Local Moran's I", subtitle = subtitle)  +
+    # ggtitle ("Local Moran's I", subtitle = subtitle)  +
     xlab("Longitude") + ylab("Latitude") +
     scale_fill_viridis_d(option = "magma", direction = -1) +
     labs(fill = "Significance") +
     theme_void()
+  
+  # replace special characters subtitle 
+  subtitle <- stringr::str_replace(subtitle, " / ", "_")
+  subtitle <- stringr::str_replace(subtitle, "-", "_")
+    
+  ggsave(path = plot_path, filename = sprintf(plot_template, subtitle), scale=1)
 }
 
 plot_localmoran_sig(data$edgar, data, lw = lw_knn, subtitle = "edgar / k-nearest-neighbours")
