@@ -8,16 +8,29 @@ model_base <- log(edgar) ~ log(pop) + log(density) + log(gdppc) +
 ols_base <- lm(model_base, data)
 summary(ols_base)
 
+# check for MAUP
+ols_maup <- lm(model_base, data_nuts2)
+summary(ols_maup)
+
+
+
 model_cntr <- log(edgar) ~ log(pop) + log(density) + log(gdppc) + 
   I(log(gdppc)^2) + gwa_share_BE + 
   log(hdd) + log(cdd_fix) + cntr_code
 ols_cntr <- lm(model_cntr, data)
 summary(ols_cntr)
 
+model_base_no_density <- log(edgar) ~ log(pop) + log(gdppc) + 
+  I(log(gdppc)^2) + gwa_share_BE +
+  log(hdd) + log(cdd_fix)
+ols_no_density <- lm(model_base_no_density, data)
+summary(ols_no_density)
+
 output <- stargazer::stargazer(ols_base, ols_cntr, digits=2, # type = "text", 
                                single.row = TRUE, no.space = TRUE,
-                               covariate.labels = c("Population", "Density", "Income", "Income, Squared",
-                                                  "Gross Value Added in Industry", "Heating Days", "Cooling Days"),
+                               dep.var.labels = "CO2",
+                               covariate.labels = c("Population", "Density", "GDP/cap", "GDP/cap, squared",
+                                                  "GWA", "Heating Days", "Cooling Days"),
                                column.sep.width = "3pt", font.size = "tiny",
                                title = "OLS Regression Results",
                                out = "output/tables/OLS.tex") # flip = TRUE ?
@@ -25,7 +38,7 @@ output <- stargazer::stargazer(ols_base, ols_cntr, digits=2, # type = "text",
 # filter out all entries containing country dummies
 output <- output[!grepl("cntr",output)]
 constant_line_nr <- grep("Constant",output)
-dummy_line <- "  Country Dummies & no & yes \\\\" # 4 backslashes makes 2
+dummy_line <- "  Country Dummies & No & Yes \\\\" # 4 backslashes makes 2
 
 # put output together
 output <- c(output[1:constant_line_nr],
@@ -39,6 +52,7 @@ cat(output, file = "./output/tables/OLS_dummyshort.tex", sep = "\n")
 
 # save plots under
 plot_path <- "output/plots/"
+theme_set(theme_minimal())
 
 ## 1. Create proper W matrix
 
@@ -95,25 +109,36 @@ plot_localmoran_sig <- function(test_input, data, lw, subtitle){
   #   scale_fill_viridis_c(option = "magma", direction = -1) +
   #   theme(legend.title = element_blank())
   
+  not_sig_str <- "n.sig"
+  
   data_I <- data_I %>% dplyr::mutate(p = `Pr.z...0.`, 
-                                     sig=ifelse(p < 0.001, "P < 0.001", 
+                                     sig=ifelse(p < 0.001, "p < 0.001", 
                                                 ifelse(p < 0.05, 
-                                                       "P < 0.05", "NS")),
-                                     sig=ifelse(sig == "NS",sig,
-                                                paste(ifelse(Ii>0,"pos.","neg."),sig)))
+                                                       "p < 0.05", not_sig_str)),
+                                     sig=ifelse(sig == not_sig_str,sig,
+                                                paste(ifelse(Ii>0,"pos,","neg,"),sig)))
   # set as factor to have logical (and not alphabetical) ordering
   data_I$sig <- factor(data_I$sig, 
-                       levels = c(unique(data_I$sig)[unique(data_I$sig)!="NS"] %>% 
+                       levels = c(unique(data_I$sig)[unique(data_I$sig)!=not_sig_str] %>% 
                                     sort(),
-                                  "NS"))
+                                  not_sig_str))
 
+  # ggplot(data = data_I) +
+  #   geom_sf(aes(group = sig, fill = sig), color = NA) +
+  #   # ggtitle ("Local Moran's I", subtitle = subtitle)  +
+  #   xlab("Longitude") + ylab("Latitude") +
+  #   scale_fill_viridis_d(option = "magma", direction = -1) +
+  #   labs(fill = "Significance") +
+  #   theme_void()
+  
   ggplot(data = data_I) +
-    geom_sf(aes(group = sig, fill = sig), color = "black") +
-    # ggtitle ("Local Moran's I", subtitle = subtitle)  +
-    xlab("Longitude") + ylab("Latitude") +
-    scale_fill_viridis_d(option = "magma", direction = -1) +
-    labs(fill = "Significance") +
-    theme_void()
+    geom_sf_pattern(data = shape_nuts0, colour = 'black', fill = 'white', pattern = 'stripe',                    
+                    pattern_size = 0.5, pattern_linetype = 1, pattern_spacing = 0.008,                    
+                    pattern_fill = "white", pattern_density = 0.1, pattern_alpha = 0.7) + 
+    geom_sf(aes(fill = sig), color = "white", size=0.01) + 
+    scale_fill_manual(values = magma(4)[2:4]) +
+    theme(legend.title = element_blank()) +
+    geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
   
   # replace special characters subtitle 
   subtitle <- stringr::str_replace(subtitle, " / ", "_")

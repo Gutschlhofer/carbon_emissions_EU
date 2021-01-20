@@ -55,16 +55,26 @@ data_fix_outlier <- data %>%
                 density = ifelse(density > quantile(density,0.99), quantile(density,0.99), density),
                 gdppc = ifelse(gdppc > quantile(gdppc,0.99), quantile(gdppc,0.99), gdppc))
 
+data_filter_outlier <- data %>% 
+  dplyr::filter(!(edgar > quantile(edgar,0.99)),
+                !(density > quantile(density,0.99)),
+                !(gdppc > quantile(gdppc,0.99)))
+
 summary(data)
 saveRDS(data, "input/data.rds")
 saveRDS(data_fix_outlier, "input/data_fix_outlier.rds")
+saveRDS(data_filter_outlier, "input/data_filter_outlier.rds")
 
 # Create cor tables ------------------------------------------------------------
-temp <- st_drop_geometry(data_fix_outlier)
+temp <- st_drop_geometry(data)
 temp$gdppc2 <- data$gdppc^2
 # correlation of actual values
-cor(temp %>% dplyr::select(edgar, pop, gdppc, gdppc2, density, gwa_share_BE, hdd, cdd_fix)) %>% 
-  stargazer(out = "output/tables/cor.tex")
+cortab <- cor(temp %>% dplyr::select(edgar, pop, density, gdppc, gdppc2,  gwa_share_BE, hdd, cdd_fix))
+rownames(cortab) <-  colnames(cortab) <- c("CO2", "Population", "Density", "GDP/cap", "GDP/cap^2", 
+                                            "GWA", "Heating D.", "Cooling D.")
+stargazer(cortab, column.sep.width = "0pt", 
+          title = "Correlation Coefficients",
+          out = "output/tables/cor.tex")
 # correlation of log values (care: different gdppc2 specification)
 temp_log <- temp %>% mutate(
   edgar = log(edgar),
@@ -72,11 +82,16 @@ temp_log <- temp %>% mutate(
   gdppc = log(gdppc),
   gdppc2 = log(gdppc)^2,
   density = log(density),
-  gwa_share_BE = log(gwa_share_BE),
+  gwa_share_BE = gwa_share_BE,
   hdd = log(hdd),
   cdd_fix = log(cdd_fix))
-cor(temp_log %>% dplyr::select(edgar, pop, gdppc, gdppc2, density, gwa_share_BE, hdd, cdd_fix)) %>% 
-  stargazer(out = "output/tables/cor_log.tex")
+cortab.log <- cor(temp_log %>% dplyr::select(edgar, pop, density, gdppc, gdppc2,  gwa_share_BE, hdd, cdd_fix))
+rownames(cortab.log) <-  colnames(cortab.log) <- c("CO2", "Population", "Density", "GDP/cap", "GDP/cap, squared", 
+                                           "GWA", "Heating D.", "Cooling D.")
+
+stargazer(cortab.log, column.sep.width = "0pt",
+          title = "Correlation of Model Variables",
+            out = "output/tables/cor_log.tex")
 
 # # maybe needed for time dimension
 # 
@@ -148,4 +163,57 @@ cor(temp_log %>% dplyr::select(edgar, pop, gdppc, gdppc2, density, gwa_share_BE,
 # ggplot(data = x) + 
 #   geom_sf(aes(fill = edgar)) +
 #   theme_void()
+
+data_nuts2 <- data
+data_nuts2$nuts2_id <- substr(data_nuts2$nuts3_id, 1, 4) 
+
+data_nuts2 <- data_nuts2 %>% 
+  group_by(nuts2_id) %>% 
+  summarise(cntr_code = first(cntr_code),
+            edgar = sum(edgar),
+            area = sum(area), 
+            pop = sum(pop), 
+            hdd = mean(hdd), 
+            cdd = mean(cdd)
+            )
+
+
+# gwa share
+gwa_nuts2 <- get_eurostat("nama_10r_3gva") %>% 
+  filter(nchar(geo) == 4 & currency == "MIO_EUR") %>% 
+  filter(nace_r2 != "C" & nace_r2 != "G-J" & nace_r2 != "K-N" 
+         & nace_r2 != "O-Q" & nace_r2 != "R-U" & nace_r2 != "TOTAL") %>% 
+  group_by(geo, time) %>% 
+  mutate(gwashare = round(values/sum(values),3)) %>% 
+  dplyr::select(nace_r2, geo, time, gwashare)
+gwa_nuts2$time <- format(as.Date(gwa_nuts2$time, format="%Y/%m/%d"),"%Y")
+
+gwaind_nuts2 <- gwa_nuts2 %>% 
+  filter(nace_r2 == "B-E" & time == 2016 ) 
+
+gwaind_nuts2 <- gwaind_nuts2 %>%  rename(nuts2_id = geo, gwa_share_BE = gwashare)
+gwaind_nuts2$time <- format(as.Date(gwaind_nuts2$time, format="%Y/%m/%d"),"%Y")
+data_nuts2 <- left_join(data_nuts2, gwaind_nuts2 %>% dplyr::select(-c(time, nace_r2)), by="nuts2_id")
+
+
+# gdp
+gdp_nuts2 <- get_eurostat("nama_10r_3gdp", filters = list(unit = "MIO_PPS")) %>% 
+  filter(nchar(geo) == 4 & time == "2016-01-01") 
+gdp_nuts2 <- gdp_nuts2 %>% rename(nuts2_id = geo, gdp = values)
+data_nuts2 <- left_join(data_nuts2, gdp_nuts2 %>% dplyr::select(-c(time, unit)), by="nuts2_id")
+
+
+# gdppc 
+gdppc_nuts2 <- get_eurostat("nama_10r_3gdp", filters = list(unit = "PPS_HAB")) %>% 
+  filter(nchar(geo) == 4 & time == "2016-01-01")  
+gdppc_nuts2 <- gdppc_nuts2 %>% rename(nuts2_id = geo, gdppc = values)
+gdppc_nuts2$time <- format(as.Date(gdppc_nuts2$time, format="%Y/%m/%d"),"%Y")
+data_nuts2 <- left_join(data_nuts2, gdppc_nuts2 %>% dplyr::select(-c(time, unit)), by="nuts2_id")
+
+data_nuts2 <- data_nuts2 %>%
+dplyr::mutate(
+  heating_or_cooling = hdd + cdd,
+  density = pop/area,
+  cdd_fix = cdd+1, 
+  cdd_log = ifelse(cdd == 0, 0, log(cdd)) )
 
