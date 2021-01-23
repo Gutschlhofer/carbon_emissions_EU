@@ -22,7 +22,9 @@ p_load(ggpattern)
 p_load(spgwr)
 p_load(nngeo)
 p_load(gridExtra)
+p_load(cowplot)
 # add new packages with p_load(packagename)
+
 
 ## eurostat NUTS 3 shapefile----------------------------------------------------
 
@@ -59,17 +61,12 @@ getShapefile <- function(replace = FALSE){
                   "ITG29", "ITG2A", "ITG2B", "ITG2C", "EL431", "EL432", "EL433", 
                   "EL434", "EL411", "EL412", "EL413", "EL421", "EL422", "CY000")
     
-    # shape_nuts3 <- shape_nuts3 %>% 
-    #   dplyr::filter(!(substr(nuts3_id, 1, 4) %in% overseas))
     shape_nuts3 <- shape_nuts3 %>% 
       dplyr::filter(!nuts3_id %in% overseas)
-    
-    # plot(sf::st_geometry(shape_nuts3))
     
     # re-project into an azimuthal projection (keeping area constant, hence using true area representation)
     shape_equalarea <- st_transform(shape_nuts3, "epsg:3035")
     shape_equalarea$area <- as.numeric(st_area(shape_equalarea))
-    # st_crs(shape_equalarea)
     # area is in m^2
     
     # geometry needs to be dropped so that we can join the attributes to the original shapefile
@@ -103,15 +100,38 @@ getShapefile <- function(replace = FALSE){
 }
 
 
+# we need a nuts0 shapefile so that we can add country borders to the plot
+# to exclude regions overseas, exclude them from nuts1 level 
 shape_nuts1 <- eurostat::get_eurostat_geospatial(output_class="sf", resolution="1", nuts_level=1, year=2016) 
 names(shape_nuts1) <- tolower(names(shape_nuts1))
 
-
-shape_nuts1_agg <- shape_nuts1 %>% 
+# then aggregate based on ctnr_code (and exclude turkey, iceland and cyprus for nicer and more centred plots)
+shape_nuts0 <- shape_nuts1 %>% 
   filter(!nuts_id %in% c("FRY", "PT2", "PT3", "ES7") & (cntr_code != "TR" & cntr_code != "IS" & cntr_code != "CY") ) %>% 
   count(cntr_code)
 
-shape_nuts1_agg <- st_remove_holes(shape_nuts1_agg)
+# this is needed for st_pattern 
+shape_nuts0 <- st_remove_holes(shape_nuts0)
 
-# getShapefile(replace = TRUE)
+
+# add kosovo and bosnia to the shapefile
+ba <- readRDS("./input/shapefile_ba_xk/gadm36_BIH_0_sf.rds") %>%
+  rename(cntr_code = "GID_0",
+         n = "NAME_0",
+         geom = "geometry")
+ba$cntr_code <- "BA"
+ba$n <- 1
+
+xk <- readRDS("./input/shapefile_ba_xk/gadm36_XKO_0_sf.rds") %>%
+  rename(cntr_code = "GID_0",
+         n = "NAME_0",
+         geom = "geometry")
+xk$cntr_code <- "XK"
+xk$n <- 1
+
+shape_nuts0 <- rbind(shape_nuts0, ba)
+shape_nuts0 <- rbind(shape_nuts0, xk)
+
+shape_nuts0 <- st_buffer(shape_nuts0, dist = 0)
+
 
