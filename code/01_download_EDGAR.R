@@ -1,5 +1,6 @@
-## this file downloads the edgar data-------------------------------------------
-# we decided to use "CO2_excl_short-cycle_org_C"
+## This file downloads the EDGAR data-------------------------------------------
+# use "CO2_excl_short-cycle_org_C" (same as Videras)
+# also added CH4 and N20 but not used
 
 if(! file.exists("./input/data_edgar.rds")) {
   
@@ -7,10 +8,12 @@ if(! file.exists("./input/data_edgar.rds")) {
   
   dir.create("input/edgar")
   
-  # CO2------------------------------------------------------------------------
+  # CO2-------------------------------------------------------------------------
   
+  # create directory
   dir.create("input/edgar/co2")
   
+  # download and unzip file
   download.file("https://edgar.jrc.ec.europa.eu/download.php?edgar_dst=187465",
                 "input/edgar/co2/v50_CO2_excl_short-cycle_org_C_TOTALS")
   
@@ -18,22 +21,27 @@ if(! file.exists("./input/data_edgar.rds")) {
   
   fs <- list.files("input/edgar/co2", pattern = ".txt$", full.names = T)
   
-  # only for 2000-2018
+  # use only years 2000-2018
   fs <- fs[31:49]
   
+  # get the NUTS3 shapefile
   shape_nuts3 <- getShapefile()
 
+  # read first file (2000), check for same projection
   r <- read.delim(file = fs[1], header = T, sep = ";", dec = ".", skip = 2) %>%
     dplyr::select(lon, lat, value = starts_with("emission")) %>%
     rasterFromXYZ(crs = "+proj=longlat +datum=WGS84") #not sure about the datum but projection should be correct
   
-  # check if .nc files have the same projection as shapefile
+  # check if .nc files have the same projection as shapefile, per construction
   if(!compareCRS(shape_nuts3, r)) print("Warning: shape and nc file have different CRS!")
   
-  
+  # create data.frame to save extracted data
   data_edgar_co2 <- data.frame()
   
+  # use multiple cores from server
   registerDoMC(20)
+  
+  # extract data
   data_edgar_co2 <- foreach(f = fs) %dopar% {
     
     r <- read.delim(file = f, header = T, sep = ";", dec = ".", skip = 2) %>%
@@ -50,12 +58,14 @@ if(! file.exists("./input/data_edgar.rds")) {
     return(d)
   }
   
+  # save CO2 data
   data_edgar_co2 <- do.call(rbind, data_edgar_co2)
   #saveRDS(data_edgar_co2, "input/data_edgar_co2.rds")
   
   
   
-  # CH4------------------------------------------------------------------------
+  # CH4-------------------------------------------------------------------------
+  # same procedure as for CO2
   
   dir.create("input/edgar/ch4")
   
@@ -101,7 +111,8 @@ if(! file.exists("./input/data_edgar.rds")) {
   
   
   
-  # N2O------------------------------------------------------------------------
+  # N2O-------------------------------------------------------------------------
+  # same procedure as for CO2
   
   dir.create("input/edgar/n2o")
   
@@ -149,5 +160,5 @@ if(! file.exists("./input/data_edgar.rds")) {
   # rbind all
   data_edgar <- rbind(data_edgar_co2, data_edgar_ch4, data_edgar_n2o)
   saveRDS(data_edgar , "input/data_edgar.rds")
+  
 }
-
