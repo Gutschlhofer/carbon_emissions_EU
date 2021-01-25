@@ -6,17 +6,7 @@ if(! file.exists("./input/data_eurostat.rds")) {
   
   # Download Data following Videras:--------------------------------------------
   
-  # 1) Area (OLD not needed anymore, is taken from shapefile)
-  # Total Area is chosen (landuse = "TOTAL")
-  # other option: total land use (landuse = "L0008")
-  
-  # area <- get_eurostat("reg_area3", filters = list(landuse = "TOTAL")) %>% 
-  #   filter(nchar(geo) == 5)  %>% #keep only NUTS 3 regions 
-  #   dplyr::select(-landuse)
-  # area$time <- format(as.Date(area$time, format="%Y/%m/%d"),"%Y") #convert date to year
-  # area$unit <- "area"
-  
-  # 2.) Population
+  # 1.) Population
   # Total (men + women) over all agegroups are chosen, only data for 2014-2018
   pop <- get_eurostat("demo_r_pjangrp3") %>% 
     filter(sex == "T" & age == "TOTAL" & nchar(geo) == 5) %>% 
@@ -59,7 +49,7 @@ if(! file.exists("./input/data_eurostat.rds")) {
     arrange(year, nuts3_id)
   
   
-  # 3.) GDP and GPD/PC
+  # 2.) GDP and GPD/PC
   # PPP standards and PPP per capita are chosen here, other alternatives woud be:
   #   Million Euros (unit = "MIO_EUR")
   #   Million PPS (unit = "MIO_PPS")
@@ -75,7 +65,7 @@ if(! file.exists("./input/data_eurostat.rds")) {
   gdppc$unit <- "gdppc"
   
   
-  # 4.) Employment per sector
+  # 3.) Employment per sector
   # Indicator chosen:
   # V16910 = Persons employed in the population of active enterprises in t - number
   # Industries of Interest - available on eurostat; (Videras actually used)
@@ -110,7 +100,7 @@ if(! file.exists("./input/data_eurostat.rds")) {
   empltrans$unit <- "emp_share_H"
   
   
-  # 5.) Gross valua added per sector
+  # 4.) Gross valua added per sector
   # Industries of Interest - available on eurostat; (Videras actually used)
   #   G-I = Wholesale and retail trade, transport, accommodation and food service activities ; (Transportation and Utilities)
   #   B-E = Industry; (Manufacturing)
@@ -138,7 +128,7 @@ if(! file.exists("./input/data_eurostat.rds")) {
   colnames(gwatrans) <- c("unit", "geo", "time","values")
   
   
-  # Download Data additional data:------------------------------------------------  
+  # Download Data additional data (not used in analysis):-----------------------
   # 1.) People at risk of poverty or social exclusion 
   # Only available on NUTS2, so not added to main data for now
   socexcl <- get_eurostat("ilc_peps11") %>% 
