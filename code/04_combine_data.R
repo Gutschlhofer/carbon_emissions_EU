@@ -6,31 +6,34 @@ year_filter <- 2016
 shape_nuts3 <- getShapefile()
 # eurostat
 data_eurostat <- readRDS("input/data_eurostat.rds") %>% 
-  filter(year == year_filter) %>% 
+  dplyr::filter(year == year_filter) %>% 
   pivot_wider(names_from = "indicator", values_from = "value")
 # EDGAR
 data_edgar <- readRDS("input/data_edgar.rds") %>%  
-  filter(indicator == "edgar_co2") %>%
-  filter(year == year_filter) %>% 
+  dplyr::filter(indicator == "edgar_co2") %>%
+  dplyr::filter(year == year_filter) %>% 
   pivot_wider(names_from = "indicator", values_from = "value") %>%
   dplyr::mutate(year = as.character(year)) %>%
   rename(edgar = "edgar_co2") # only use co2 excl short cycle, we can add other greenhouse gases by summing them
 # heating and cooling days
 data_heating_cooling <- readRDS("input/data_heating_cooling.rds") %>% 
-  filter(year == year_filter) %>% 
+  dplyr::filter(year == year_filter) %>% 
   dplyr::mutate(indicator = tolower(indicator)) %>% 
   pivot_wider(names_from = "indicator", values_from = "value") %>% 
   dplyr::mutate(year = as.character(year))
 
+# combine data
 data <- shape_nuts3 %>% 
   left_join(data_eurostat, by = c("nuts3_id")) %>% 
   left_join(data_edgar, by = c("nuts3_id", "year")) %>%
   left_join(data_heating_cooling, by = c("nuts3_id", "year"))
 
+# remove loaded sub-data
 rm(data_eurostat, data_edgar, data_heating_cooling)
 
 summary(data)
 
+#perfrom some calculations
 data <- data %>% 
   dplyr::mutate(
     # gdppc_2 = gdppc^2,
@@ -164,6 +167,9 @@ stargazer(cortab.log, column.sep.width = "0pt",
 #   geom_sf(aes(fill = edgar)) +
 #   theme_void()
 
+# Create dataset for NUTS2 Analysis (MAUP)--------------------------------------
+
+
 data_nuts2 <- data
 data_nuts2$nuts2_id <- substr(data_nuts2$nuts3_id, 1, 4) 
 
@@ -216,4 +222,7 @@ dplyr::mutate(
   density = pop/area,
   cdd_fix = cdd+1, 
   cdd_log = ifelse(cdd == 0, 0, log(cdd)) )
+
+# save the nuts2 data
+saveRDS(datadata_nuts2, "input/data_nuts2.rds")
 
