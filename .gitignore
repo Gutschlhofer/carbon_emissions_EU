@@ -16,7 +16,6 @@
 
 # Output files from R CMD check
 /*.Rcheck/
-output_fail/
 
 # RStudio files
 .Rproj.user/
@@ -38,3 +37,7 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# Output files
+output/plots/
+output/tables/
