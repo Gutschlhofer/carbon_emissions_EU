@@ -16,6 +16,7 @@
 
 # Output files from R CMD check
 /*.Rcheck/
+output_fail/
 
 # RStudio files
 .Rproj.user/
