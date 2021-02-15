@@ -3,7 +3,7 @@
 source("code/00_libraries_functions.R")
 
 
-# Download and munge data ------------------------------------------------------
+# Download and prepare data ----------------------------------------------------
 ## common standard: long tibble/data.frame, with year|nuts3_id|value|indicator
 
 ## EDGAR: CO2 emissions excl. short cycle C
