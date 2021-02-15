@@ -1,7 +1,7 @@
 # load data
 # data <- readRDS("input/data.rds")
 
-# I=PAT
+# Base model -------------------------------------------------------------------
 model_base <- log(edgar) ~ log(pop) + log(density) + log(gdppc) + 
   I(log(gdppc)^2) + gwa_share_BE +
   log(hdd) + log(cdd_fix)
@@ -12,8 +12,7 @@ summary(ols_base)
 ols_maup <- lm(model_base, data_nuts2)
 summary(ols_maup)
 
-
-
+# Model with country dummies ---------------------------------------------------
 model_cntr <- log(edgar) ~ log(pop) + log(density) + log(gdppc) + 
   I(log(gdppc)^2) + gwa_share_BE + 
   log(hdd) + log(cdd_fix) + cntr_code
@@ -26,11 +25,14 @@ model_base_no_density <- log(edgar) ~ log(pop) + log(gdppc) +
 ols_no_density <- lm(model_base_no_density, data)
 summary(ols_no_density)
 
+# OLS TABLE
+# Output for Presentation (fontsize = tiny):
+################################################################################
 output <- stargazer::stargazer(ols_base, ols_cntr, digits=2, # type = "text", 
                                single.row = TRUE, no.space = TRUE,
                                dep.var.labels = "CO2",
                                covariate.labels = c("Population", "Density", "GDP/cap", "GDP/cap, squared",
-                                                  "GWA", "Heating Days", "Cooling Days"),
+                                                  "GWA", "HDD", "CDD"),
                                column.sep.width = "3pt", font.size = "tiny",
                                title = "OLS Regression Results",
                                out = "output/tables/OLS.tex") # flip = TRUE ?
@@ -48,6 +50,30 @@ output <- c(output[1:constant_line_nr],
 # save output
 cat(output, file = "./output/tables/OLS_dummyshort.tex", sep = "\n")
 
+# Output for Presentation (fontsize = footnotesize):
+################################################################################
+output <- stargazer::stargazer(ols_base, ols_cntr, digits=2, # type = "text", 
+                               single.row = TRUE, no.space = TRUE,
+                               dep.var.labels = "CO2",
+                               covariate.labels = c("Population", "Density", "GDP/cap", "GDP/cap, squared",
+                                                    "GWA", "HDD", "CDD"),
+                               column.sep.width = "3pt", font.size = "footnotesize",
+                               title = "OLS Regression Results",
+                               out = "output/tables/OLS_footnotesize.tex") # flip = TRUE ?
+
+# filter out all entries containing country dummies
+output <- output[!grepl("cntr",output)]
+constant_line_nr <- grep("Constant",output)
+dummy_line <- "  Country Dummies & No & Yes \\\\" # 4 backslashes makes 2
+
+# put output together
+output <- c(output[1:constant_line_nr],
+            dummy_line,
+            output[(constant_line_nr+1):length(output)])
+
+# save output
+cat(output, file = "./output/tables/OLS_dummyshort_paper.tex", sep = "\n")
+
 # Moran I test -----------------------------------------------------------------
 
 # save plots under
@@ -59,7 +85,7 @@ theme_set(theme_minimal())
 data_coords <- st_coordinates(st_centroid(data$geometry))
 
 ### knn
-k <- round(0.203187 * nrow(data)) # use amount of neighbours determined by gwr_sel
+k <- round(0.163404391231319 * nrow(data)) # use amount of neighbours determined by gwr_sel
 lw_knn <- knearneigh(data_coords, k=k) %>% 
   knn2nb()
 
@@ -98,19 +124,12 @@ moran.test(ols_cntr$residuals, lw_inversedist_all)
 ## 3. Local Moran's I Test
 
 plot_template <- paste0("localmoran_sig_%s",".png")
+not_sig_str <- "n.sig"
 
-plot_localmoran_sig <- function(test_input, data, lw, subtitle){
+plot_localmoran_sig <- function(test_input, data, lw, subtitle) {
   localI <- data.frame(localmoran(test_input, lw))
   data_I <- cbind(data, localI)
-  # ggplot(data = data_I) +
-  #   geom_sf(aes(fill = Ii), color = "black") +
-  #   ggtitle ("Local Moran's I", subtitle = "New Zealand - Median Income")  +
-  #   xlab("Longitude") + ylab("Latitude") +
-  #   scale_fill_viridis_c(option = "magma", direction = -1) +
-  #   theme(legend.title = element_blank())
-  
-  not_sig_str <- "n.sig"
-  
+
   data_I <- data_I %>% dplyr::mutate(p = `Pr.z...0.`, 
                                      sig=ifelse(p < 0.001, "p < 0.001", 
                                                 ifelse(p < 0.05, 
@@ -123,14 +142,6 @@ plot_localmoran_sig <- function(test_input, data, lw, subtitle){
                                     sort(),
                                   not_sig_str))
 
-  # ggplot(data = data_I) +
-  #   geom_sf(aes(group = sig, fill = sig), color = NA) +
-  #   # ggtitle ("Local Moran's I", subtitle = subtitle)  +
-  #   xlab("Longitude") + ylab("Latitude") +
-  #   scale_fill_viridis_d(option = "magma", direction = -1) +
-  #   labs(fill = "Significance") +
-  #   theme_void()
-  
   ggplot(data = data_I) +
     geom_sf_pattern(data = shape_nuts0, colour = 'black', fill = 'white', pattern = 'stripe',                    
                     pattern_size = 0.5, pattern_linetype = 1, pattern_spacing = 0.008,                    
@@ -143,8 +154,9 @@ plot_localmoran_sig <- function(test_input, data, lw, subtitle){
   # replace special characters subtitle 
   subtitle <- stringr::str_replace(subtitle, " / ", "_")
   subtitle <- stringr::str_replace(subtitle, "-", "_")
-    
-  ggsave(path = plot_path, filename = sprintf(plot_template, subtitle), scale=1)
+  subtitle <- stringr::str_replace(subtitle, " ", "_")
+  
+  ggsave(path = plot_path, filename = sprintf(plot_template, subtitle), scale=1, width = 4, height = 5)
 }
 
 plot_localmoran_sig(data$edgar, data, lw = lw_knn, subtitle = "edgar / k-nearest-neighbours")

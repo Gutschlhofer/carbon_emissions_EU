@@ -1,71 +1,53 @@
-# # alternative
-# library(GWmodel)
-# bw.ggwr
-# bw.gwr
-# gwr.basic
-# gwr.robust
-
-# source("code/00_libraries_functions.R")
-# source("code/06_model_OLS.R")
-
 # 1. Prepare data for GWR ------------------------------------------------------
 
-# data <- data_fix_outlier
+s <- TRUE # save plots?
 
 # choose one of the methods
-# either set adapt manually (no gwr.sel is run or via code (NULL))
+# either set adapt manually (no gwr.sel is run or via optimisation (NULL))
 run_gwr <- function(data,
                     method = c("bisq","gauss","tricube"),
                     adapt = NULL,
                     file_name_add = "",
-                    model = model_base){
+                    model = model_base,
+                    cv = FALSE # gwr.sel method = cv (cv = TRUE) or aic (cv = FALSE)
+                    ) {
   
-  # data_coords <- st_coordinates(st_point_on_surface(data$geometry))
   data_coords <- st_coordinates(st_centroid(data$geometry))
   
   # make spatial data frame
-  spdf = SpatialPointsDataFrame(data_coords, 
+  spdf <- SpatialPointsDataFrame(data_coords, 
                                 st_drop_geometry(data), 
                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
   
   # 2. bandwidth function, run GWR -----------------------------------------------
-  # bw_fct <- c("bisq","gauss","tricube")[1]
   bw_fct <- method
-  
+
   if(bw_fct == "bisq"){
-    # bw_old <- gwr.sel(model_base, data = spdf,# coords = data_coords,
-    #                   gweight = gwr.bisquare, longlat = TRUE, verbose = FALSE)#,
-    # #method = "aic") # AIC does not work for bisq
-    # gwr_old <- gwr(model_base, data = spdf, # data = data, coords = data_coords,
-    #                bandwidth = bw_old, gweight = gwr.bisquare,
-    #                longlat = TRUE, se.fit = TRUE, hatmatrix = TRUE)
-    
     # find best neighbour specification
     # select bandwidth, here Videras (2014) uses >>gwr.bisquare<<
     bw <- ifelse(is.null(adapt),
                  gwr.sel(model, data = spdf,# coords = data_coords, 
                           gweight = gwr.bisquare, longlat = TRUE, verbose = FALSE, adapt = TRUE
-                          ,method = "aic"),
+                          ,method = ifelse(cv, "cv", "aic")),
                  adapt)
-    # 0.203187
-    # 0.23975778 for data_fix_outlier
-    
+
     gwr <- gwr(model, data = spdf,
                adapt = bw, gweight = gwr.bisquare,
                longlat = TRUE, se.fit = TRUE, hatmatrix = TRUE)
-    
   } else if(bw_fct == "gauss"){
-    bw <- gwr.sel(model, data = spdf,
-                  gweight = gwr.Gauss, longlat = TRUE, verbose = FALSE,
-                  adapt = TRUE, method = "aic")
+    bw <- ifelse(is.null(adapt),
+                 gwr.sel(model, data = spdf,# coords = data_coords, 
+                         gweight = gwr.Gauss, longlat = TRUE, verbose = FALSE, adapt = TRUE
+                         ,method = ifelse(cv, "cv", "aic")),
+                 adapt)
     
     gwr <- gwr(model, data = spdf,
                adapt = bw, gweight = gwr.Gauss,
                longlat = TRUE, se.fit = TRUE, hatmatrix = TRUE)
-  } else {
+  } else { # tricube
     bw <- gwr.sel(model, data = spdf, 
                   gweight = gwr.tricube, longlat = TRUE, verbose = FALSE,
-                  adapt = TRUE, method = "aic")
+                  adapt = TRUE, method = ifelse(cv, "cv", "aic"))
     
     gwr <- gwr(model, data = spdf,
                adapt = bw, gweight = gwr.tricube,
@@ -73,11 +55,6 @@ run_gwr <- function(data,
   }
   
   print(paste("adapt Bandwidth:",bw))
-  
-  # our bisq bw is 969, which basically includes all observations (969/1122)
-  # bw <- 285 # or 150 or 450
-  # bw <- bwGauss
-  # bw <- 150
   
   # 3. Calculate p-values for estimators -----------------------------------------
   
@@ -98,8 +75,8 @@ run_gwr <- function(data,
     k <- 8 # 7 x + 1 intercept
     
     t.stat<-(gwr_output[,x]-0)/gwr_output[,se] # calculate t-statistic (substract H0 beta)
-    pval.t<-2*pt(-abs(t.stat), df=(n-k)) #calculate p-value (assume normal residuals)
-    ## ERROR: actually n-k df
+    pval.t<-2*pt(-abs(t.stat), df=(n-k))       # calculate p-value (assume normal residuals)
+    ## error: actually n-k df
     # print(pval.t)
     gwr_output[,p] <- pval.t
     
@@ -144,7 +121,7 @@ run_gwr <- function(data,
     scale_fill_viridis_c(option = "magma", direction = -1) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_Pop"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_Pop"), width = 4, height = 5)
   
   # log.gdppc.
   gwr_gdp <- ggplot(data = data_coef) +
@@ -155,7 +132,7 @@ run_gwr <- function(data,
     scale_fill_viridis_c(option = "magma", direction = -1) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc"), width = 4, height = 5)
   
   # I.log.gdppc..2.
   gwr_gdp2 <- ggplot(data = data_coef) +
@@ -166,11 +143,10 @@ run_gwr <- function(data,
     scale_fill_viridis_c(option = "magma", direction = -1) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc2"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc2"), width = 4, height = 5)
   
   GDP_GDP2 <- plot_grid(gwr_gdp, gwr_gdp2, ncol = 2)
-  if(s) ggsave(plot = GDP_GDP2, path = plot_path, filename = sprintf(plot_template, "log_GDPpc_GDPpc2")) 
-  # ggsave(plot = GDP_GDP2, path = plot_path, filename = "gwr_log_GDPpc_GDPpc2.png") 
+  if(s) ggsave(plot = GDP_GDP2, path = plot_path, filename = sprintf(plot_template, "log_GDPpc_GDPpc2"), width = 10, height = 6) 
 
   # log.density.
   if(!is.null(data_coef$log.density.)){
@@ -182,7 +158,7 @@ run_gwr <- function(data,
       scale_fill_viridis_c(option = "magma", direction = -1) +  
       theme(legend.title = element_blank()) +
       geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-    ggsave(path = plot_path, filename = sprintf(plot_template, "log_Density"))
+    if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_Density"), width = 4, height = 5)
   }
   
   # gwa_share_BE
@@ -190,11 +166,11 @@ run_gwr <- function(data,
     geom_sf_pattern(data = shape_nuts0, colour = 'black', fill = 'white', pattern = 'stripe',                    
                     pattern_size = 0.5, pattern_linetype = 1, pattern_spacing = 0.008,                    
                     pattern_fill = "white", pattern_density = 0.1, pattern_alpha = 0.7) + 
-    geom_sf(aes(fill = gwa_share_BE), color = "white", size=0.01) + 
+    geom_sf(aes(fill = gwa_share_BE.1), color = "white", size=0.01) + 
     scale_fill_viridis_c(option = "magma", direction = -1) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"), width = 4, height = 5)
   
   # log.hdd.
   ggplot(data = data_coef) +
@@ -205,7 +181,7 @@ run_gwr <- function(data,
     scale_fill_viridis_c(option = "magma", direction = -1) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_HDD"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_HDD"), width = 4, height = 5)
   
   # log.cdd_fix.
   ggplot(data = data_coef) +
@@ -216,7 +192,7 @@ run_gwr <- function(data,
     scale_fill_viridis_c(option = "magma", direction = -1) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_CDD_fix"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_CDD_fix"), width = 4, height = 5)
   
   # localR2
   ggplot(data = data_coef) +
@@ -227,7 +203,7 @@ run_gwr <- function(data,
     scale_fill_viridis_c(option = "magma", direction = -1, labels = scales::percent_format(accuracy = 1)) +  
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "local_R2"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "local_R2"), width = 4, height = 5)
   
   
   # significance plots -----------------------------------------------------------
@@ -242,7 +218,7 @@ run_gwr <- function(data,
     scale_fill_manual(values = rev(magma(4)[2:4])) +
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_Pop"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_Pop"), width = 4, height = 5)
   
   # log.density._p_sig
   if(!is.null(data_coef$log.density._p_sig)){
@@ -254,7 +230,7 @@ run_gwr <- function(data,
       scale_fill_manual(values = rev(magma(4)[2:4])) +
       theme(legend.title = element_blank()) +
       geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-    ggsave(path = plot_path, filename = sprintf(plot_template, "log_Density"))
+    if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_Density"), width = 4, height = 5)
   }
     
   # log.gdppc._p_sig
@@ -266,7 +242,7 @@ run_gwr <- function(data,
     scale_fill_manual(values = rev(magma(4)[2:4])) +
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc"), width = 4, height = 5)
   
   # I.log.gdppc..2._p_sig
   ggplot(data = data_coef) +
@@ -277,7 +253,7 @@ run_gwr <- function(data,
     scale_fill_manual(values = rev(magma(4)[2:4])) +
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc2"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_GDPpc2"), width = 4, height = 5)
   
   # log.gwa_share_BE._p_sig
   ggplot(data = data_coef) +
@@ -288,7 +264,7 @@ run_gwr <- function(data,
     scale_fill_manual(values = rev(magma(4)[2:4])) +
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "GWA_share"), width = 4, height = 5)
   
   # log.hdd._p_sig
   ggplot(data = data_coef) +
@@ -299,7 +275,7 @@ run_gwr <- function(data,
     scale_fill_manual(values = rev(magma(4)[2:4])) +
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_HDD"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_HDD"), width = 4, height = 5)
   
   # log.cdd_fix._p_sig
   ggplot(data = data_coef) +
@@ -310,7 +286,7 @@ run_gwr <- function(data,
     scale_fill_manual(values = rev(magma(4)[2:4])) +
     theme(legend.title = element_blank()) +
     geom_sf(data=shape_nuts0, color='#000000', fill=NA, size=0.1)
-  ggsave(path = plot_path, filename = sprintf(plot_template, "log_CDD_fix"))
+  if(s) ggsave(path = plot_path, filename = sprintf(plot_template, "log_CDD_fix"), width = 4, height = 5)
   
   
   # 5. Tests ---------------------------------------------------------------------
@@ -349,32 +325,24 @@ run_gwr <- function(data,
   print(moran_id_all)
 }
 
-run_gwr(data, method = "bisq", adapt = 0.203186957155516) # result of bisq AIC
+## After running through it the first time, you can put in the adapt value with adapt= to save resources
+run_gwr(data, method = "bisq", adapt = NULL)
 run_gwr(data, method = "bisq", adapt = .1, file_name_add = "_lessneighbours")
 run_gwr(data, method = "bisq", adapt = .3, file_name_add = "_moreneighbours")
+run_gwr(data, method = "bisq", adapt = NULL, file_name_add = "_cv", cv = TRUE)
+
+# Gauss
+run_gwr(data, method = "gauss", adapt = NULL, file_name_add = "_gauss")
+run_gwr(data, method = "gauss", adapt = 0.2, file_name_add = "_gauss_20pct")
+run_gwr(data, method = "gauss", adapt = NULL, file_name_add = "_gauss_cv", cv = TRUE)
 
 # treat outliers
-run_gwr(data_fix_outlier, method = "bisq", adapt = 0.188065182679875, file_name_add = "_fixoutlier")
-run_gwr(data_filter_outlier, method = "bisq", adapt = 0.188077476917333, file_name_add = "_filteroutlier")
+run_gwr(data_fix_outlier, method = "bisq", adapt = NULL, file_name_add = "_fixoutlier")
+run_gwr(data_filter_outlier, method = "bisq", adapt = NULL, file_name_add = "_filteroutlier")
 
 # try without density
-run_gwr(data, method = "bisq", model = model_base_no_density, adapt = 0.0793237242334166, file_name_add = "_nodensity")
-run_gwr(data_fix_outlier, method = "bisq", model = model_base_no_density, adapt = 0.0909189589985161, file_name_add = "_nodensity_fixoutlier")
+run_gwr(data, method = "bisq", model = model_base_no_density, adapt = NULL, file_name_add = "_nodensity")
+run_gwr(data_fix_outlier, method = "bisq", model = model_base_no_density, adapt = NULL, file_name_add = "_nodensity_fixoutlier")
 
 # try NUTS2 (MAUP)
-run_gwr(data_nuts2, method = "bisq", file_name_add = "_nuts2")
-
-gwr <- readRDS("input/gwr.rds")
-gwr_lessnb <- readRDS("input/gwr_lessneighbours.rds")
-gwr_morenb <- readRDS("input/gwr_moreneighbours.rds")
-
-data_coef <- readRDS("input/data_coef.rds")
-# data_coef <- readRDS("input/data_coef_lessneighbours.rds")
-# data_coef <- readRDS("input/data_coef_moreneighbours.rds")
-
-
-# library(GWmodel)
-# 
-# bw <- GWmodel::bw.gwr(formula = model_base, data = spdf,
-#                       approach = "AIC", longlat=T)
-
+run_gwr(data_nuts2, method = "bisq", adapt = NULL, file_name_add = "_nuts2")
