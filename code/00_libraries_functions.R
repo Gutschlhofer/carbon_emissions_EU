@@ -42,7 +42,7 @@ getShapefile <- function(replace = FALSE){
     # create a directory
     dir.create("input/shapefile")
     
-    shape_nuts3 <- eurostat::get_eurostat_geospatial(output_class="sf", resolution="60", nuts_level=3, year=2016) %>% 
+    shape_nuts3 <- eurostat::get_eurostat_geospatial(output_class="sf", resolution="1", nuts_level=3, year=2016) %>% 
       dplyr::rename("nuts3_id" = "NUTS_ID")
     names(shape_nuts3) <- tolower(names(shape_nuts3))
     # plot(sf::st_geometry(shape_nuts3))
@@ -66,8 +66,8 @@ getShapefile <- function(replace = FALSE){
     
     # re-project into an azimuthal projection (keeping area constant, hence using true area representation)
     shape_equalarea <- st_transform(shape_nuts3, "epsg:3035")
-    shape_equalarea$area <- as.numeric(st_area(shape_equalarea))
-    # area is in m^2
+    shape_equalarea$area <- as.numeric(st_area(shape_equalarea))/1e6
+    # area is in km^2
     
     # geometry needs to be dropped so that we can join the attributes to the original shapefile
     shape_equalarea <- st_drop_geometry(shape_equalarea)
@@ -85,7 +85,7 @@ getShapefile <- function(replace = FALSE){
 
 # we need a NUTS0 shapefile so that we can add country borders to the plot
 # to exclude regions overseas, exclude them from NUTS1 level 
-shape_nuts1 <- eurostat::get_eurostat_geospatial(output_class="sf", resolution="60", nuts_level=1, year=2016) 
+shape_nuts1 <- eurostat::get_eurostat_geospatial(output_class="sf", resolution="1", nuts_level=1, year=2016) 
 names(shape_nuts1) <- tolower(names(shape_nuts1))
 
 # then aggregate based on ctnr_code (and exclude Turkey, Iceland and Cyprus for nicer and more centered plots)
@@ -115,6 +115,7 @@ xk$n <- 1
 
 # rbind to shapefile
 shape_nuts0 <- rbind(shape_nuts0, ba, xk)
+rm(ba, xk)
 
 # buffer one last time if something went wrong
 shape_nuts0 <- st_buffer(shape_nuts0, dist = 0)
