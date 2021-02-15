@@ -33,18 +33,18 @@ rm(data_eurostat, data_edgar, data_heating_cooling)
 
 summary(data)
 
-#perfrom some calculations
+# perfrom some calculations
 data <- data %>% 
   dplyr::mutate(
     # gdppc_2 = gdppc^2,
-    density = pop/area, # pop per m2
+    density = (pop/area)/1000, # pop per m2, density in 1000people/km2
     heating_or_cooling = hdd + cdd,
     cdd_fix = cdd+1, # move our scale by 1 to be able to log it
     cdd_log = ifelse(cdd == 0, 0, log(cdd))
   )
 
 # exclude so we have gdp, population and GWA share BE
-exclude <- c("NO","CH", "TR", "RS", "IE", "UK", "LI")
+exclude <- c("NO","CH", "TR", "RS", "IE", "UK", "LI", "MT")
 data <- data[!data$cntr_code%in%exclude,]
 # exclude so we have CDD,HDD
 exclude <- c("AL","MK","ME")
@@ -63,10 +63,41 @@ data_filter_outlier <- data %>%
                 !(density > quantile(density,0.99)),
                 !(gdppc > quantile(gdppc,0.99)))
 
+
+# we check the EDGAR country aggregates with the EDGAR values
+edgar_input <- readxl::read_xls("input/v50_CO2_excl_short-cycle_org_C_1970_2018.xls",
+                                sheet = 3, skip = 9) %>%
+  dplyr::mutate(cntr_code = countrycode::countrycode(ISO_A3, "iso3c", "iso2c",
+                                                     custom_match = c("GRC" = "EL",
+                                                                      "GBR" = "UK")))
+
+data_with_edgar <- data %>%
+  st_drop_geometry() %>%
+  dplyr::group_by(cntr_code) %>%
+  dplyr::summarise(edgar = sum(edgar)) %>%
+  dplyr::left_join(edgar_input[,c("cntr_code", "ISO_A3", "2016")], by = "cntr_code") %>%
+  dplyr::mutate(scale = edgar/`2016`/1e3) # gigagramms in t: 1e3
+
 summary(data)
 saveRDS(data, "input/data.rds")
 saveRDS(data_fix_outlier, "input/data_fix_outlier.rds")
 saveRDS(data_filter_outlier, "input/data_filter_outlier.rds")
+
+# Summary stats for paper  -----------------------------------------------------
+
+temp <- st_drop_geometry(data) %>% 
+  dplyr::select(edgar, pop, density, gdppc,  gwa_share_BE, hdd, cdd_fix) %>%
+  mutate(edgar = round(edgar, digits = 1),
+         gdppc = round(gdppc, digits = 1),
+         hdd = round(hdd, digits = 1),
+         cdd_fix = round(cdd_fix, digits = 1)
+         )
+
+colnames(temp) <- c("CO2", "Population", "Density", "GDP/cap", "GWA", 
+                    "HDD", "CDD")
+
+stargazer(temp, digits = 2, median = TRUE)
+
 
 # Create cor tables ------------------------------------------------------------
 temp <- st_drop_geometry(data)
@@ -74,7 +105,7 @@ temp$gdppc2 <- data$gdppc^2
 # correlation of actual values
 cortab <- cor(temp %>% dplyr::select(edgar, pop, density, gdppc, gdppc2,  gwa_share_BE, hdd, cdd_fix))
 rownames(cortab) <-  colnames(cortab) <- c("CO2", "Population", "Density", "GDP/cap", "GDP/cap^2", 
-                                            "GWA", "Heating D.", "Cooling D.")
+                                            "GWA", "HDD", "CDD")
 stargazer(cortab, column.sep.width = "0pt", 
           title = "Correlation Coefficients",
           out = "output/tables/cor.tex")
@@ -90,85 +121,13 @@ temp_log <- temp %>% mutate(
   cdd_fix = log(cdd_fix))
 cortab.log <- cor(temp_log %>% dplyr::select(edgar, pop, density, gdppc, gdppc2,  gwa_share_BE, hdd, cdd_fix))
 rownames(cortab.log) <-  colnames(cortab.log) <- c("CO2", "Population", "Density", "GDP/cap", "GDP/cap, squared", 
-                                           "GWA", "Heating D.", "Cooling D.")
+                                           "GWA", "HDD", "CDD")
 
 stargazer(cortab.log, column.sep.width = "0pt",
           title = "Correlation of Model Variables",
             out = "output/tables/cor_log.tex")
 
-# # maybe needed for time dimension
-# 
-# doesn't change anything anymore
-# data_new <- data %>% 
-#   filter(!is.na(gdppc),
-#          !is.na(edgar),
-#          !is.na(cdd),
-#          !is.na(hdd))
-# 
-# summary(data_new)
-# 
-# 
-# check for NAs
-# data_na <- data[is.na(data$cdd),]
-# data_na <- data[is.na(data$gwa_share_BE),]
-# 
-# library(leaflet)
-## 1. plot all and highlight the NAs
-# data %>% 
-#   dplyr::mutate(myvar = cdd,
-#                 mylabel = nuts3_id) %>% 
-#   dplyr::mutate(is_na = is.na(myvar)) %>% 
-#   leaflet() %>%
-#   addPolygons(color = "#444444", weight = 1, smoothFactor = 0.5,
-#               opacity = 1.0, fillOpacity = 0.5,
-#               fillColor = ~colorFactor("YlOrRd", is_na)(is_na),
-#               
-#               highlightOptions = highlightOptions(color = "white", weight = 2,
-#                                                   bringToFront = TRUE),
-#               label = ~mylabel,
-#               labelOptions = leaflet::labelOptions(
-#                 style = list("font-weight" = "normal", padding = "3px 8px"),
-#                 textsize = "15px",
-#                 direction = "auto"))
-# 
-## 2. just plot the NAs
-# data_na %>% 
-#   dplyr::mutate(myvar = CDD,
-#                 mylabel = nuts3_id) %>% 
-#   leaflet() %>%
-#   addPolygons(color = "#444444", weight = 1, smoothFactor = 0.5,
-#               opacity = 1.0, fillOpacity = 0.5,
-#               fillColor = ~colorQuantile("YlOrRd", myvar)(myvar),
-#               highlightOptions = highlightOptions(color = "white", weight = 2,
-#                                                   bringToFront = TRUE),
-#               label = ~mylabel,
-#               labelOptions = leaflet::labelOptions(
-#                 style = list("font-weight" = "normal", padding = "3px 8px"),
-#                 textsize = "15px",
-#                 direction = "auto"))
-# 
-# unique(data_na$cntr_code)
-# 
-# data_na <- data[rowSums(is.na(data)) > 0,]
-# 
-# plot(data_na[,c("geometry","CDD")])
-# 
-# data_na <- data[is.na(data$edgar),]
-# plot(data_na[,c("geometry","edgar")])
-# 
-# #install.packages("sjmisc")
-# library(sjmisc)
-# 
-# x <- left_join(shape_nuts3, data_edgar)
-# 
-# x$edgar <- group_var(x$edgar, size = 5)
-# 
-# ggplot(data = x) + 
-#   geom_sf(aes(fill = edgar)) +
-#   theme_void()
-
 # Create dataset for NUTS2 Analysis (MAUP)--------------------------------------
-
 
 data_nuts2 <- data
 data_nuts2$nuts2_id <- substr(data_nuts2$nuts3_id, 1, 4) 
@@ -180,8 +139,7 @@ data_nuts2 <- data_nuts2 %>%
             area = sum(area), 
             pop = sum(pop), 
             hdd = mean(hdd), 
-            cdd = mean(cdd)
-            )
+            cdd = mean(cdd))
 
 
 # gwa share
@@ -224,5 +182,5 @@ dplyr::mutate(
   cdd_log = ifelse(cdd == 0, 0, log(cdd)) )
 
 # save the nuts2 data
-saveRDS(datadata_nuts2, "input/data_nuts2.rds")
+saveRDS(data_nuts2, "input/data_nuts2.rds")
 
