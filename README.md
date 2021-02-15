@@ -1,5 +1,5 @@
 # Exploring spatial patterns of carbon emissions in the EU
-Spatial economics seminar paper based on Videras (2014) exploring spatial patterns of carbon emissions in Europe.
+Spatial economics seminar paper based on Videras (2014) exploring spatial patterns of carbon emissions in Europe applying a Geographically Weighted Regression approach.
 
 ## Data
 Most data is automatically downloaded via scripts in the [code](code) folder.
